@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>test for integrity and confidentiality</title>
+		<script src='/fuzz/location.js?m=@se1&t=y'></script>
+		<script src='/fuzz/location.js?m=@se2&t=y'></script>
+		<script src='/fuzz/location.js?m=@se3&t=y'></script>
+		<script src='/fuzz/location.js?m=@se4&t=y'></script>
+		<script src='/fuzz/location.js?m=@se5&t=y'></script>
+		<script src='/fuzz/location.js?m=@se6&t=n'></script>
+		<script src='/fuzz/location.js?m=@se7&t=n'></script>
+		<script src='/fuzz/location.js?m=@se8&t=n'></script>
+		<script src='/fuzz/location.js?m=@se9&t=n'></script>
+		<script src='/fuzz/location.js?m=@se10&t=n'></script>
+	</head>
+	<body>
+		test benchmark for 10 domain.
+	</body>
+
+</html>

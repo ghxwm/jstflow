@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>test for integrity and confidentiality</title>
+		<script src='/fuzz/location.js?m=@se&t=n' type='text/javascript'></script>
+	</head>
+	<body>
+		test benchmark.
+	</body>
+
+</html>

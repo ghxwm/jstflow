@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>test for integrity and confidentiality</title>
+		<script type='text/javascript'>_b=new Date()</script>
+		<script src='/fuzz/location.js?m=@sp'></script>
+		<!--
+		<script src='/fuzz/location.js?m=@sd'></script>
+		<script src='/fuzz/location.js?m=@so'></script>
+		<script src='/fuzz/location.js?m=@se'></script>
+
+		<script src='/fuzz/location.js?m=@sp'></script>
+		<script src='/fuzz/location.js?m=@sd'></script>
+		<script src='/fuzz/location.js?m=@so'></script>
+		<script src='/fuzz/location.js?m=@se'></script>
+		-->
+	</head>
+	<body>
+		test benchmark.
+	</body>
+<script type='text/javascript'>_e=new Date();console.log('elapse time:'+(_e-_b)/1000);</script>
+</html>
