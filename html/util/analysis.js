@@ -499,14 +499,15 @@ if (typeof T$ === 'undefined') T$ = {};
             }
             
             //前置触发,值未存储
-                sandbox.analysis.putFieldPre(iid, base, offset, val);
-            				//执行put操作
+                var disallow = sandbox.analysis.putFieldPre(iid, base, offset, val);
+                if(disallow)return val;
+                //执行put操作
             if (typeof base_c==='function' && getConcrete(offset)==='prototype') {
                 base_c[offset_c] = getConcrete(val);// 保存原型继承
             } else if(isDom(base_c) || base_c instanceof CSSStyleDeclaration){ //dom节点
                 base_c[offset_c] = getConcrete(val);
             }else{
-                base_c[offset_c] = val;
+                base_c[offset_c] = getConcrete(val);
             }
 
             	//后置触发,值已经存储
@@ -647,8 +648,8 @@ if (typeof T$ === 'undefined') T$ = {};
         }
    		//写操作
         function W(iid, name, val, lhs,isLocal) {
-                sandbox.analysis.writePre(iid, name, val,isLocal);
-
+                var disallow = sandbox.analysis.writePre(iid, name, val,isLocal);
+                						if(disallow)return val;
                 val = sandbox.analysis.write(iid, name, val,isLocal);
             return val;
         }

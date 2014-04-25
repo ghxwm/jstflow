@@ -296,6 +296,10 @@
         							this[SPECIAL_PROP_URL] = this['bkpUrl'+iid];
         		}
         		
+        		this.isCurrentUrlUntrusted = function(){
+        							return this[SPECIAL_PROP_URL].indexOf('t=n') != -1;
+        		}
+        		
         		//定点恢复备份的间接污点集合.
         		this.restoreTaintSet = function(iid){
         						this.setCurrentTaintSet(this['bkp'+iid]);
@@ -523,9 +527,6 @@
        		}
        		
        		this.checkTaintWrite = function(val,objName,propName){
-       				/*	if(!policy.hasLocation(objName,propName)){
-       										return;
-       					}*/
        						var taints = getSymbolic(val),t;
        						if(!taints)return ;
        						taints = taints.data();
@@ -535,21 +536,24 @@
        							t = taints[i];
        							//violate integrition
        							path[lblIndex] = t.url;
-       										if(t.vioIntegrity()){  //有违反完整性的流
+       							if(t.vioConfidentiality()){  //被感染
+       													VIC++;TFC++;
+       													incCounter(TWC,path);
+       												return true;
+       										}else if(policy.hasLocation(objName,propName) && this.isCurrentUrlUntrusted()){ //
+       											TFC++;VIC++;
+       											incCounter(TWC,path);
+       											return false;
+       										}
+       									/*	if(t.vioIntegrity()){
        											incCounter(TWC,path);
        											VIC++;TFC++;
        											log("policy violation:write taint value at {0}.{1} from url {2}".format(objName,propName,t.url));
        										}else if(policy.hasLocation(objName,propName)){
        											TFC++;
-       												/*	if(this.isCurrentUrlUntrusted()){
-       																VIC++;
-       																incCounter(TWC,path);
-       																			
-       													}*/
-       													//console.log("write data location:",objName,propName,this[SPECIAL_PROP_URL])
-       											//incCounter(TWC,path);
+       											incCounter(TRC,path);
        											return false;
-       										}
+       										}*/
        										
        						}
        		}

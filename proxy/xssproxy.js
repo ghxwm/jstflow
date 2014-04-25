@@ -4,10 +4,41 @@ var path = require('path');
 var zlib = require('zlib');
 //var iconv = require('iconv-lite'); 
 var BufferHelper = require('bufferhelper');
+var xss = require('xss');
 var inst = require('/home/xwm/code/jstflow/html/util/esnstrument');
-var   PORT=5000;
- 
-console.log("http proxy start at port: "+PORT);
+var   PORT=5003;
+/*
+var scriptCodeBegin,scriptCodeEnd,xssoptions;
+var scriptCodeList=[];
+
+xssoptions={
+	allowCommentTag:true,
+	onTag:function(tag,html,info){
+		var code;
+		if(tag == 'script'){
+			if(!info.isClosing){//起始标签
+				scriptCodeBegin = info.sourcePosition + html.length;
+				if( html.indexOf('src') != -1 ){//src attribute means that no code in script tag
+					scriptCodeBegin = false;
+				}else{
+					code = "";	
+				}
+			}else{ //结束标签
+				scriptCodeEnd = info.sourcePosition;
+				if(scriptCodeBegin){scriptCodeList.append([scriptCodeBegin,scriptCodeEnd]);}
+				code = xssoptions.source.substring(scriptCodeBegin,scriptCodeEnd);
+				console.log("onEndTag:",tag,xssoptions.source.substring(scriptCodeBegin,scriptCodeEnd));
+			}
+			//return replaceJs(html);
+		}	
+	},
+	onIgnoreTagAttr:function(tag,name,value,isWhiteAttr){return name+'="'+value+'"';},
+	escapeHtml:function(html){return html}
+}
+
+var myxss = new xss.FilterXSS(xssoptions);
+*/ 
+console.log("http xss proxy start at port: "+PORT);
  
 http.globalAgent.maxSockets=16;
  
@@ -96,6 +127,26 @@ http.createServer(function(req,res){
      clientReq.on('error',function(e){console.log(e);});
  }).listen(PORT);
 
+function encodeInput(input){
+	
+
+}
+
+var ENC_MAP = {
+	'<':'&lt;',
+	'>':'&gt;',
+	'"':'&quot;',
+	"'":'&#39;',
+	'..':'&.#.'
+}
+function encodeUrl(url){
+	var ret=[];
+	for(var i = 0 ;i < url.length;i++){
+		
+	}
+	return ret.join(',');
+}
+
 function processJs(content,pathname){
 	console.log('processing file:' + pathname+"\n");
 	var labelIdx = pathname.indexOf('m=@');
@@ -122,18 +173,58 @@ var scripts = [
 	         'jsuri-1.1.1.js',
 	         'policy.js',
 //	         'NOPEngine.js',
-	         'TaintEngine.js',
-	         'analysis.js'
-		//'ga_t_.js'
+	         'XSSTaintEngine.js',
+	         'analysis.js',
+		'jquery.js'
 	         ];
+var evil_scripts=[
+	'sniffForm.js'
+]
+
 var shead = '\n';
 for(var i = 0 ; i < scripts.length;i++){
 	shead += "<script src='http://127.0.0.1:8888/util/" + scripts[i] + "' type='text/javascript'></script>\n";
 }
+
+for(var i = 0 ; i < evil_scripts.length;i++){
+	shead += "<script src='http://127.0.0.1:10001/evil/" + evil_scripts[i] + "' type='text/javascript'></script>\n";
+}
+
+//shead += "<script src='http://127.0.0.1:10001/util/" + scripts[i] + "' type='text/javascript'></script>\n";
+
 shead += "<script type='text/javascript'>_b=new Date();</script>";
 
 var sfoot = "<script type='text/javascript'>window.addEventListener('load',function(){_e=new Date();console.log('elapse time:'+(_e-_b)/1000);if(typeof T$ !== 'undefined')T$.endExecution();});</script>";
 
+/*
+function replaceJs(code){
+		if(code){
+			//console.log('instrumenting script code:'+p2);
+			if( code[0] === '{' )code="("+code+")";//code is object literal
+			try{
+				var ret = inst.instrumentCode(code,myxss.pageUrl)
+			}catch(e){
+				console.log('instrument code exception:'+code)
+				return code;
+			}			
+			return code;
+		} 
+	}
+*/
+/*
+function processHtml(content,pathname){
+	//inject script file and instrument inner script code;
+	//console.log('before instrumented html content:'+content);
+	//var ret = content;
+	xssoptions.pageUrl=pathname;
+	xssoptions.source=content;
+	//console.log("HTML content:"+content);
+	var ret=myxss.process(content);
+	ret = ret.replace(/(<head>[\s\S]*?<\/head>)/,shead+"$1");
+	ret = ret.replace(/(<\/body>)([\s\S]*?)(<\/html>)/,"$1$2"+sfoot+"$3");
+	//console.log('instrumented html content:'+ret);	
+	return ret;
+}*/
 function processHtml(content,pathname){
 	function replacer(matched,p1,p2,offset,all){
 		if(p1.indexOf('fsrc') != -1){
@@ -145,17 +236,27 @@ function processHtml(content,pathname){
 		}
 		if(!p1)p1 = 'type="text/javascript"';		
 		if(p2){
+			var quoted = false;
+			for(var i = offset - 1;i>0;i--) {
+				if(all[i] == '"' || all[i] == "'"){quoted = true;return matched;}
+				if(all[i] == '>' || all[i] == '<')break;
+			}
+					
 			//console.log('instrumenting script code:'+p2);
 			if( p2[0] === '{' )p2="("+p2+")";//p2 is object literal
-			var ret = "<script inst "+p1+">"+inst.instrumentCode(p2,pathname)+"</script>"
+			try{
+				var ret = "<script inst "+p1+">"+inst.instrumentCode(p2,pathname)+"</script>"
+			}catch(e){return matched;}
+			
 			return ret;
 		} 
 	}
 	//inject script file and instrument inner script code;
-	console.log('before instrumented html content:'+content);
+	//console.log('before instrumented html content:'+content);
 	//var ret = content;
 	var ret = content.replace(/<script([\s\S]*?)>([\s\S]*?)<\/script>/g,replacer).replace(/(<head>[\s\S]*?<\/head>)/,shead+"$1");
 	var ret = ret.replace(/(<\/body>)([\s\S]*?)(<\/html>)/,"$1$2"+sfoot+"$3");
 	//console.log('instrumented html content:'+ret);	
 	return ret;
 }
+

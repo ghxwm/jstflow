@@ -5,9 +5,9 @@ var zlib = require('zlib');
 //var iconv = require('iconv-lite'); 
 var BufferHelper = require('bufferhelper');
 var inst = require('/home/xwm/code/jstflow/html/util/esnstrument');
-var   PORT=5000;
+var   PORT=5002;
  
-console.log("http proxy start at port: "+PORT);
+console.log("http NoInst proxy start at port: "+PORT);
  
 http.globalAgent.maxSockets=16;
  
@@ -79,7 +79,7 @@ http.createServer(function(req,res){
 		processData(data);
 		function processData(data){
 			if( isJsFileType(ext) || isJsFileType(path.basename(ctype)) ){
-				data = processJs(data,_url['href']);		
+				//data = processJs(data,_url['href']);		
 			}else if(ctype === 'html'){
 				data = processHtml(data.toString(),pathname);
 			}
@@ -112,23 +112,12 @@ function processJs(content,pathname){
 		
 	}
 }
-
 var scripts = [
-		 'global.js', 
-		 'esprima.js',
-		 'escodegen.browser.js',
-	         'esnstrument.browser.js',
-	         'gutil.js',
-	         'jsuri-1.1.1.js',
-	         'policy.js',
-//	         'NOPEngine.js',
-	         'TaintEngine.js',
-	         'analysis.js'
-		//'ga_t_.js'
+		 'fuzz/idGenerator.js'
 	         ];
 var shead = '\n';
 for(var i = 0 ; i < scripts.length;i++){
-	shead += "<script src='http://127.0.0.1:8888/util/" + scripts[i] + "' type='text/javascript'></script>\n";
+	shead += "<script src='http://127.0.0.1:8888/" + scripts[i] + "' type='text/javascript'></script>\n";
 }
 shead += "<script type='text/javascript'>_b=new Date();</script>";
 
@@ -152,9 +141,9 @@ function processHtml(content,pathname){
 		} 
 	}
 	//inject script file and instrument inner script code;
-	console.log('before instrumented html content:'+content);
+	//console.log('before instrumented html content:'+content);
 	//var ret = content;
-	var ret = content.replace(/<script([\s\S]*?)>([\s\S]*?)<\/script>/g,replacer).replace(/(<head>[\s\S]*?<\/head>)/,shead+"$1");
+	var ret = content.replace(/(<head>[\s\S]*?<\/head>)/,shead+"$1");
 	var ret = ret.replace(/(<\/body>)([\s\S]*?)(<\/html>)/,"$1$2"+sfoot+"$3");
 	//console.log('instrumented html content:'+ret);	
 	return ret;

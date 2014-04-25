@@ -101,6 +101,9 @@
 
     var instrumentCodeFunName = PREFIX1+".instrumentCode";//打桩函数
 
+    	//浏览器全局对象名称
+    var global_names = {document:true,window:true,arguments:true,location:true,history:true};
+    
     	//语法组成
     var Syntax = {
         AssignmentExpression: 'AssignmentExpression',
@@ -265,7 +268,8 @@
 
     }
 
-    var filename;//文件名
+    var filename;//全局文件名
+    var isEval=false;//
 
 // J$_i in expression context will replace it by an AST
 // {J$_i} will replace the body of the block statement with an array of statements passed as argument
@@ -484,24 +488,31 @@
 //    }
     		// 读取变量时进行undefined检查I（name,）
     function wrapReadWithUndefinedCheck(node, name) {
-        var ret = replaceInExpr(
+    		if(global_names[name]){return node;}
+    	
+       /* var ret = replaceInExpr(
             "("+logIFunName+"(typeof ("+name+") === 'undefined'? ("+name+"="+RP+"2) : ("+name+"="+RP+"3)))",
             createIdentifierAst(name),
             wrapRead(node, createLiteralAst(name),createIdentifierAst("undefined"), false, true),
             wrapRead(node, createLiteralAst(name),createIdentifierAst(name), true, true)
-        );
+        );*/
+        var ret = replaceInExpr(
+                "("+logIFunName+"(typeof ("+name+") !== 'undefined'? "+RP+"1 : undefined))",
+                wrapRead(node, createLiteralAst(name),createIdentifierAst(name), false, true)
+            );
         transferLoc(ret, node);
         return ret;
     }
 
-    function wrapWrite(node, name, val, lhs) {
+    function wrapWrite(node, name, val, lhs,isLocal) {
         printIidToLoc(node);
         var ret = replaceInExpr(
-            logWriteFunName+"("+RP+"1, "+RP+"2, "+RP+"3, "+RP+"4)",
+            logWriteFunName+"("+RP+"1, "+RP+"2, "+RP+"3, "+RP+"4,"+RP+"5)",
             getIid(),
             name,
             val,
-            lhs
+            lhs,
+            createLiteralAst(isLocal)
         );
         transferLoc(ret, node);
         return ret;
@@ -578,8 +589,11 @@
     }
     		//对eval函数参数进行解析
     function wrapEvalArg(ast) {
+    	var modFile = (typeof filename === "string")?
+                filename.replace(".js",FILESUFFIX1+".js"):
+                "internal";
         var ret =  replaceInExpr(
-            instrumentCodeFunName+"("+PREFIX1+".getConcrete("+RP+"1), true)",
+            instrumentCodeFunName+"("+PREFIX1+".getConcrete("+RP+"1),'"+modFile+"',true)",
             ast
         );
         transferLoc(ret, ast);
@@ -669,7 +683,7 @@
     }
 
     function wrapConditional(node, test) {
-        if (node === null) {
+        if (node == null) {
             return node;
         } // to handle for(;;) ;
 
@@ -735,7 +749,7 @@
         printIidToLoc(node);
         var id = getIid();
         	node.eeid = id;
-        var ret = replaceInStatement(logScriptEntryFunName+"("+RP+"1,"+RP+"2)",
+        var ret = replaceInStatement(logScriptEntryFunName+"("+RP+"1,"+RP+"2,"+isEval+")",
             id,
             createLiteralAst(instrumentedFileName));
         transferLoc(ret[0].expression, node);
@@ -851,7 +865,7 @@
             filename.replace(".js",FILESUFFIX1+".js"):
             "internal";
         var body = createCallAsScriptEnterStatement(node, modFile).
-            concat(syncDefuns(node, scope, true)).concat(body0);
+           concat(syncDefuns(node, scope, true)).concat(body0);
             
         return body;
     }
@@ -859,12 +873,13 @@
 
     function syncDefuns(node, scope, isScript) {
         var ret = [];
+        /*
         if(!isScript) {
             ret = ret.concat(createCallInitAsStatement(node,
                 createLiteralAst("arguments"),
                 createIdentifierAst("arguments"),
                 true));
-        			}
+        			}*/
         if (scope){
             for (var name in scope.vars) {
                 if (HOP(scope.vars, name)) {
@@ -876,6 +891,7 @@
                             wrapLiteral(ident, ident, N_LOG_FUNCTION_LIT),
                             false));
                     								}
+                    /*
                     if (scope.vars[name] ==="arg") {
                         ret = ret.concat(createCallInitAsStatement(node,
                             createLiteralAst(name),
@@ -888,6 +904,7 @@
                             createIdentifierAst(name),
                             false));
                     							}
+                    							*/
                 			}//end if HOP
             }//end for
         		}//end scope
@@ -917,7 +934,7 @@
         var ret;
         if (node.left.type === 'Identifier') {
             if (scope.hasVar(node.left.name)) {
-                ret = wrapWrite(node.right, createLiteralAst(node.left.name), node.right, node.left);
+                ret = wrapWrite(node.right, createLiteralAst(node.left.name), node.right, node.left,true);
             } else {
                 ret = wrapWriteWithUndefinedCheck(node.right, createLiteralAst(node.left.name), node.right, node.left);
 
@@ -937,7 +954,7 @@
 
             var tmp2;
             if (scope.hasVar(node.left.name)) {
-                tmp2= wrapWrite(node.right, createLiteralAst(node.left.name),tmp1, node.left);
+                tmp2= wrapWrite(node.right, createLiteralAst(node.left.name),tmp1, node.left,true);
             } else {
                 tmp2= wrapWriteWithUndefinedCheck(node.right, createLiteralAst(node.left.name),tmp1, node.left);
 
@@ -986,8 +1003,8 @@
                 ret = wrapRead(ast, createLiteralAst(ast.name),ast);
                 return ret;
             } else {
-                //ret = wrapReadWithUndefinedCheck(ast, ast.name);
-                ret = wrapRead(ast, createLiteralAst(ast.name),ast,false,true);
+                ret = wrapReadWithUndefinedCheck(ast, ast.name);
+                //ret = wrapRead(ast, createLiteralAst(ast.name),ast,false,true);
                 return ret;
             			}
         			}
@@ -1055,7 +1072,7 @@
         "VariableDeclaration": function (node) {
             var declarations = MAP(node.declarations, function(def){
                 if (def.init !== null) {
-                    var init = wrapWrite(def.init, createLiteralAst(def.id.name), def.init, def.id);
+                    var init = wrapWrite(def.init, createLiteralAst(def.id.name), def.init, def.id,true);
                     def.init = init;
                 							}
                 return def;
@@ -1157,6 +1174,7 @@
 
     
     function funCond(node) {
+	//if(!node.test){console.log('condition empty:'+JSON.stringify(node));}
         var ret = wrapConditional(node.test, node.test);
         node.test  = ret;
         return node;
@@ -1235,7 +1253,7 @@
             return node;
         },
         "ConditionalExpression": function(node){
-        			return wrapConditionExpression(code);		
+        				return wrapConditionExpression(node);	
         		},
        "WithStatement":function(node){
     	   		node.object = wrapWithObject(node,node.object);
@@ -1363,10 +1381,11 @@
 
     var noInstr = "//DO NOT INSTRUMENT";
 
-    function instrumentCode(code,fileName) {
+    function instrumentCode(code,fileName,evalFlag) {
         var oldCondCount;
         var noTryCatchAtTop = true;
-        			filename = fileName;
+        if(fileName)filename = fileName;
+        isEval = evalFlag;
         if (typeof  code === "string" && !(code.indexOf(noInstr)>=0)) {
             if (noTryCatchAtTop) {
                 oldCondCount = condCount;
@@ -1381,6 +1400,7 @@
                 condCount = oldCondCount;
             }
             var ret = newCode+"\n"+noInstr+"\n";
+            isEval = false;
             return ret;
         } else {
             return code;

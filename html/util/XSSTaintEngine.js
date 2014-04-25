@@ -80,6 +80,10 @@
 			return this.__data;
 		}
 	
+		Set.prototype.get = function(idx){
+			return this.__data[idx];
+		}
+		
 		Set.prototype.isSubset = function(t){//s是t的子集?
 			if(!t instanceof Set)return false;
 			return !t.isSuperset(this);
@@ -167,7 +171,8 @@
 		}
 		
 		TLabel.prototype.vioIntegrity = function(){
-			return HOP(UMARK_VALUES,this.label) && this.url.indexOf('t=n') != -1;
+			return this.label == 'sd' || this.label == 'uk';
+			//return HOP(UMARK_VALUES,this.label) && this.url.indexOf('t=n') != -1;
 		}
 		
 		TLabel.prototype.isConfidentiality = function(){
@@ -175,7 +180,7 @@
 		}
 		
 		TLabel.prototype.vioConfidentiality=function(){
-			return this.label == SLABEL.SECRET && this.url.indexOf('t=n') != -1;
+			return this.label == SLABEL.SECRET;
 		}
 		
 		var HOST_URL = new Uri(location.href || "");//当前页面url
@@ -228,6 +233,13 @@
 			}
 			return map;
 	})();
+		var SLABEL_CN = {
+				'sp':'当前页面',
+				'so':'同源页面',
+				'wl':'白名单的页面',
+				'sd':'非信任域页面',
+				'uk':'<span style="color:red">非信任域</span>页面'	
+		}
 		
 		
     function TaintEngine(executionIndex) {
@@ -269,7 +281,7 @@
         		//当前间接流污点集合的getter方法
         this.currentTaintSet = function() {
         							if(this.TSET == null){
-        								debugger;
+        								//debugger;
         							}
         							
         				return this.TSET;
@@ -506,6 +518,34 @@
        						return l[p];
        					}
        
+       		
+       				this.handleReadViolation = function (objName,propName){
+   											var tlbl = this.currentTaintSet().get(0);
+   														var lbl_cn = SLABEL_CN[tlbl.label];
+   											var permitSensitive = window.confirm(""+lbl_cn + tlbl.url + "将读取敏感数据"+objName + "." + propName +",是否允许？");
+   											if(!permitSensitive){ //不允许读取敏感数据，敏感数据的值被替代.
+   																this.RTV="=blocked sensitive:"+ objName+"."+propName;//
+   																return ;
+   													}
+       									if(propName == 'cookie'){
+       													
+       												}
+       									if(propName == 'src'){
+       										
+       												}
+       					
+       						}
+       		
+       					this.handleWriteViolation = function(objName,propName,tlbl,val){
+       						var lbl_cn = SLABEL_CN[tlbl.label];
+										var permitSensitive = window.confirm(""+lbl_cn + tlbl.url + "的数据"+getConcrete(val)+"将修改敏感信息"+objName + "." + propName +",是否允许？");
+										if(!permitSensitive){ //不允许修改敏感数据，敏感数据的值被替代.
+											//this.WTV="=blocked sensitive:"+ objName+"."+propName;//
+											this.WTV=true;	//写保护
+											return ;
+										}
+       					}
+       		
        		this.checkTaintRead = function(val,objName,propName){
        						var taints = getSymbolic(val).data(),t;
        						var path=[objName,propName,this[SPECIAL_PROP_URL]];
@@ -516,6 +556,7 @@
        										incCounter(TRC,path);
        										if(t.vioConfidentiality()){
        											VCC++;
+       														this.handleReadViolation(objName,propName);
        											log("policy violation:read taint value {2} at site {0}.{1}".format(objName,propName,getConcrete(val)));
        												}
        										}
@@ -523,9 +564,10 @@
        		}
        		
        		this.checkTaintWrite = function(val,objName,propName){
-       				/*	if(!policy.hasLocation(objName,propName)){
-       										return;
-       					}*/
+       				if(policy.hasLocation(objName,propName)){
+       													TFC++;  													
+       													//return;
+       					}
        						var taints = getSymbolic(val),t;
        						if(!taints)return ;
        						taints = taints.data();
@@ -538,18 +580,19 @@
        										if(t.vioIntegrity()){  //有违反完整性的流
        											incCounter(TWC,path);
        											VIC++;TFC++;
+       											if(policy.hasLocation(objName,propName))this.handleWriteViolation(objName,propName,t,val);
        											log("policy violation:write taint value at {0}.{1} from url {2}".format(objName,propName,t.url));
-       										}else if(policy.hasLocation(objName,propName)){
+       										}/*else if(policy.hasLocation(objName,propName)){
        											TFC++;
-       												/*	if(this.isCurrentUrlUntrusted()){
+       													if(this.isCurrentUrlUntrusted()){
        																VIC++;
        																incCounter(TWC,path);
        																			
-       													}*/
+       													}
        													//console.log("write data location:",objName,propName,this[SPECIAL_PROP_URL])
        											//incCounter(TWC,path);
-       											return false;
-       										}
+       											//return false;
+       										}*/
        										
        						}
        		}
@@ -639,7 +682,9 @@
         			var t_offset = SPECIAL_PROP_TAINT + offset_c;
         			var t_val = base_c[t_offset];
         			var ret = this.updateVariableTaintSetForCurrent(t_val || val);
-        			if(!ignoreInject)this.injectTaint(base_c,offset_c,ret);
+        			if(!ignoreInject){this.injectTaint(base_c,offset_c,ret);}
+        			if(this.RTV){ret=this.updateVariableTaintSetForCurrent(this.RTV);this.RTV=undefined;}
+        			
         			//this.checkTaintRead(ret, objName, propName);
         			var val_c = getConcrete(ret);
         			if(val_c && isDom(val_c)){
@@ -655,7 +700,7 @@
 
         this.putFieldPre = function(iid, base, offset, val) {
         					this.checkWrite(val, base, offset);
-        	
+        								if(this.WTV){this.WTV=undefined;return true;}
         }
         			//store the tainted value in taint offset;
         this.putField = function(iid, base, offset, val) {
@@ -687,13 +732,14 @@
         }
 
         this.read = function(iid, name, val, isGlobal) {
+        				if(this.RTV){val=this.RTV;this.RTV=undefined;}
         				val = this.updateVariableTaintSetForCurrent(val);
         				//checkRead(name,null,val);
-        				var val_c = getConcrete(val);
-        				if(typeof val_c === 'function'){
+        				//var val_c = getConcrete(val);
+        				/*if(typeof val_c === 'function'){
         								val_c = 'function literal';
         							}
-        				log('read variable {0} with value {1} and taint set{2}'.format(name,val_c,getVariableTaintSet(val)));
+        				log('read variable {0} with value {1} and taint set{2}'.format(name,val_c,getVariableTaintSet(val)));*/
         				return val;
         }
 
@@ -716,6 +762,7 @@
         			if(!isLocal){
         				this.checkWrite(val,base,name);
         			}
+        			if(this.WTV){this.WTV=undefined;return true;}
         	
         }
 
@@ -889,7 +936,7 @@
         					//log = htmlLog;
         					log("====enter script:{0}===".format(url));
         					this.TSET = this.TSET || new Set();
-       						this[SPECIAL_PROP_URL] = url;
+       						this[SPECIAL_PROP_URL] = url.replace('_t_','');
        						this.backupUrl(iid);
        						this.backupTaintSet(iid);
        						var tlbl = this.labelForUrl();

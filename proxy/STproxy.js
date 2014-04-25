@@ -5,9 +5,9 @@ var zlib = require('zlib');
 //var iconv = require('iconv-lite'); 
 var BufferHelper = require('bufferhelper');
 var inst = require('/home/xwm/code/jstflow/html/util/esnstrument');
-var   PORT=5000;
+var   PORT=5001;
  
-console.log("http proxy start at port: "+PORT);
+console.log("http single taint proxy start at port: "+PORT);
  
 http.globalAgent.maxSockets=16;
  
@@ -122,7 +122,7 @@ var scripts = [
 	         'jsuri-1.1.1.js',
 	         'policy.js',
 //	         'NOPEngine.js',
-	         'TaintEngine.js',
+	         'SingleTaintEngine.js',
 	         'analysis.js'
 		//'ga_t_.js'
 	         ];
@@ -152,7 +152,7 @@ function processHtml(content,pathname){
 		} 
 	}
 	//inject script file and instrument inner script code;
-	console.log('before instrumented html content:'+content);
+	//console.log('before instrumented html content:'+content);
 	//var ret = content;
 	var ret = content.replace(/<script([\s\S]*?)>([\s\S]*?)<\/script>/g,replacer).replace(/(<head>[\s\S]*?<\/head>)/,shead+"$1");
 	var ret = ret.replace(/(<\/body>)([\s\S]*?)(<\/html>)/,"$1$2"+sfoot+"$3");
